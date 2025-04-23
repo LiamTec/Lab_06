@@ -1,3 +1,5 @@
+
+{% load news_extras %}
 {% extends "news/base.html" %}
 
 {% block title %}Home - Django News Portal{% endblock %}
@@ -30,7 +32,7 @@
             <a href="{{ article.get_absolute_url }}">Read more</a>
         </div>
     {% empty %}
-        <p>No articles available.</p>
+        <p>{{ article.content|truncate_words_html:30 }}</p>
     {% endfor %}
     
     {% if is_paginated %}

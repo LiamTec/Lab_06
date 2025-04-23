@@ -1,4 +1,5 @@
 {% extends "news/base.html" %}
+{% load news_extras %}
 
 {% block title %}{{ article.title }} - Django News Portal{% endblock %}
 
@@ -45,4 +46,9 @@
             {% endfor %}
         </ul>
     </div>
+
+    <div class="reading-time">
+        {{ article.content|reading_time }}
+    </div>
+    
 {% endblock %}
