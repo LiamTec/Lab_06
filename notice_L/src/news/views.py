@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.views.generic import ListView, DetailView
+from django.views.generic.edit import CreateView
+from django.urls import reverse_lazy
 from .models import Article, Category, Reporter, Tag
 
 
@@ -128,4 +130,25 @@ class TagDetailView(ListView):
         
         return context
     
+class ArticleCreateView(CreateView):
+    """View to create a new article"""
+    model = Article
+    template_name = "news/article_form.html"
+    fields = [
+        "title",
+        "slug",
+        "content",
+        "summary",
+        "image",
+        "category",
+        "reporter",
+        "status"
+    ]
+    success_url = reverse_lazy("news:home")
+    
+class CategoryCreateView(CreateView):
+    model = Category
+    template_name = 'news/category_form.html'
+    fields = ['name', 'slug', 'description']
+    success_url = reverse_lazy('news:home')
 # Create your views here.

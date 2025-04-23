@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import ArticleCreateView
 
 app_name = "news"
 
@@ -18,4 +19,6 @@ urlpatterns = [
     
     # Tag pages
     path("tag/<slug:slug>/", views.TagDetailView.as_view(), name="tag_detail"),
+    path("articles/new/", ArticleCreateView.as_view(), name="article_create"),
+
 ]

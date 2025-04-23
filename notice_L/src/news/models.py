@@ -96,3 +96,4 @@ class Tag(models.Model):
     
     def get_absolute_url(self):
         return reverse("news:tag_detail", kwargs={"slug": self.slug})
+    

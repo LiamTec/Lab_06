@@ -6,6 +6,10 @@
 {% block content %}
     <article>
         <h2>{{ article.title }}</h2>
+
+        <div class="reading-time">
+            {{ article.content|reading_time }}
+        </div>
         
         <div class="article-meta">
             <span>By <a href="{{ article.reporter.get_absolute_url }}">{{ article.reporter }}</a></span>
@@ -47,8 +51,5 @@
         </ul>
     </div>
 
-    <div class="reading-time">
-        {{ article.content|reading_time }}
-    </div>
     
 {% endblock %}
