@@ -77,7 +77,9 @@ Este proyecto está licenciado bajo la licencia MIT: consulte el archivo de LICE
 ## 👤 Autor
 
 Alessandro Davila Perez 
+
 Liam Gonzales Rojas
+
 Gean Santana Luna 
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
