@@ -1,18 +1,19 @@
 from django.db import models
-from django.utils.text import slugify
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.utils.text import slugify
+from .managers import PostManager, CommentManager
 
 
 class Category(models.Model):
-    """Category model for organizing articles"""
+    """Category model for organizing blog posts"""
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     
     class Meta:
         verbose_name_plural = "categories"
-        ordering = ["name"]
+        ordering = ['name']
     
     def __str__(self):
         return self.name
@@ -23,44 +24,61 @@ class Category(models.Model):
         super().save(*args, **kwargs)
     
     def get_absolute_url(self):
-        return reverse("news:category_detail", kwargs={"slug": self.slug})
+        return reverse('blog:category_detail', args=[self.slug])
 
 
-class Reporter(models.Model):
-    """Reporter/author model"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    bio = models.TextField(blank=True)
-    avatar = models.ImageField(upload_to="reporters/", blank=True)
+class Tag(models.Model):
+    """Tag model for categorizing blog posts"""
+    name = models.CharField(max_length=50)
+    slug = models.SlugField(unique=True)
+    
+    class Meta:
+        ordering = ['name']
     
     def __str__(self):
-        return self.user.get_full_name() or self.user.username
+        return self.name
+    
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
     
     def get_absolute_url(self):
-        return reverse("news:reporter_detail", kwargs={"pk": self.pk})
+        return reverse('blog:tag_detail', args=[self.slug])
 
 
-class Article(models.Model):
-    """News article model"""
+class Post(models.Model):
+    """Blog post model"""
     STATUS_CHOICES = (
-        ("draft", "Draft"),
-        ("published", "Published"),
+        ('draft', 'Draft'),
+        ('published', 'Published'),
     )
     
     title = models.CharField(max_length=200)
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField(unique=True, max_length=200)
     content = models.TextField()
-    summary = models.TextField(blank=True)
-    image = models.ImageField(upload_to="articles/", blank=True)
-    published_date = models.DateTimeField(auto_now_add=True)
-    updated_date = models.DateTimeField(auto_now=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="draft")
+    featured_image = models.ImageField(upload_to='posts/', blank=True)  # Image field for featured image
+    
+    # Time fields
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
     
     # Relationships
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="articles")
-    reporter = models.ForeignKey(Reporter, on_delete=models.CASCADE, related_name="articles")
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='posts')
+    tags = models.ManyToManyField(Tag, related_name='posts', blank=True)
+
+    objects = models.Manager()  # Default manager
+    blog_objects = PostManager()  # Custom manager
     
     class Meta:
-        ordering = ["-published_date"]
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+        ]
     
     def __str__(self):
         return self.title
@@ -68,32 +86,31 @@ class Article(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.title)
-        if not self.summary and self.content:
-            # Create a summary from the first 100 words of content
-            words = self.content.split()[:100]
-            self.summary = " ".join(words) + "..."
         super().save(*args, **kwargs)
     
     def get_absolute_url(self):
-        return reverse("news:article_detail", kwargs={"slug": self.slug})
+        return reverse('blog:post_detail', args=[self.slug])
 
 
-class Tag(models.Model):
-    """Tag model for articles"""
-    name = models.CharField(max_length=50)
-    slug = models.SlugField(unique=True)
+class Comment(models.Model):
+    """Comment model for blog posts"""
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
     
-    # Relationship
-    articles = models.ManyToManyField(Article, related_name="tags")
+    # Allow null=True for the author field to avoid issues with migrations
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments', null=True, blank=True)
+    
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_approved = models.BooleanField(default=False)
+    
+    objects = models.Manager()  # Default manager
+    blog_objects = CommentManager()  # Custom manager
+    
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
     
     def __str__(self):
-        return self.name
-    
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name)
-        super().save(*args, **kwargs)
-    
-    def get_absolute_url(self):
-        return reverse("news:tag_detail", kwargs={"slug": self.slug})
-    
+        return f"Comment by {self.author.username if self.author else 'Anonymous'} on {self.post.title}"

@@ -1,154 +1,122 @@
-from django.shortcuts import render, get_object_or_404
-from django.views.generic import ListView, DetailView
-from django.views.generic.edit import CreateView
+from django.views.generic import ListView, DetailView, CreateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Count
 from django.urls import reverse_lazy
-from .models import Article, Category, Reporter, Tag
+from .models import Post, Category, Tag, Comment
 
 
-class ArticleListView(ListView):
-    """View for listing articles on the home page"""
-    model = Article
-    template_name = "news/home.html"
-    context_object_name = "latest_articles"
+class PostListView(ListView):
+    """View for listing all published blog posts"""
+    model = Post
+    template_name = 'blog/post_list.html'
+    context_object_name = 'posts'
     paginate_by = 5
     
     def get_queryset(self):
-        """Get only published articles"""
-        return Article.objects.filter(status="published")
+        """Return all published posts"""
+        return Post.blog_objects.published()
     
     def get_context_data(self, **kwargs):
-        """Add categories and recent articles to context"""
+        """Add additional context data"""
         context = super().get_context_data(**kwargs)
-        context["categories"] = Category.objects.all()
-        context["recent_articles"] = Article.objects.filter(
-            status="published"
-        ).order_by("-published_date")[:5]
+        context['categories'] = Category.objects.annotate(
+            posts_count=Count('posts')
+        )
+        context['tags'] = Tag.objects.annotate(
+            posts_count=Count('posts')
+        ).order_by('-posts_count')[:10]
+        context['recent_posts'] = Post.blog_objects.recent_posts()
         return context
 
 
-class ArticleDetailView(DetailView):
-    """View for displaying a single article"""
-    model = Article
-    template_name = "news/article_detail.html"
-    context_object_name = "article"
+class PostDetailView(DetailView):
+    """View for displaying a single post with comments"""
+    model = Post
+    template_name = 'blog/post_detail.html'
+    context_object_name = 'post'
     
     def get_queryset(self):
-        """Get only published articles"""
-        return Article.objects.filter(status="published")
+        """Ensure we only show published posts"""
+        return Post.blog_objects.published()
     
     def get_context_data(self, **kwargs):
-        """Add related articles to context"""
+        """Add additional context data"""
         context = super().get_context_data(**kwargs)
-        article = self.get_object()
-        
-        # Get related articles from the same category
-        context["related_articles"] = Article.objects.filter(
-            category=article.category, 
-            status="published"
-        ).exclude(id=article.id)[:3]
-        
-        # Add categories and recent articles for sidebar
-        context["categories"] = Category.objects.all()
-        context["recent_articles"] = Article.objects.filter(
-            status="published"
-        ).order_by("-published_date")[:5]
-        
+        context['comments'] = self.object.comments.filter(is_approved=True)
+        context['categories'] = Category.objects.all()
+        context['tags'] = Tag.objects.annotate(
+            posts_count=Count('posts')
+        ).order_by('-posts_count')[:10]
+        context['recent_posts'] = Post.blog_objects.recent_posts().exclude(
+            id=self.object.id
+        )
         return context
 
 
-class CategoryDetailView(ListView):
-    """View for displaying articles in a category"""
-    template_name = "news/category_detail.html"
-    context_object_name = "articles"
+class CategoryPostListView(ListView):
+    """View for listing posts in a specific category"""
+    model = Post
+    template_name = 'blog/category_posts.html'
+    context_object_name = 'posts'
     paginate_by = 5
     
     def get_queryset(self):
-        """Get articles in the selected category"""
-        self.category = get_object_or_404(Category, slug=self.kwargs["slug"])
-        return Article.objects.filter(category=self.category, status="published")
+        """Get posts for the specified category"""
+        self.category = Category.objects.get(slug=self.kwargs['slug'])
+        return Post.blog_objects.by_category(self.category.slug)
     
     def get_context_data(self, **kwargs):
-        """Add category and sidebar info to context"""
+        """Add additional context data"""
         context = super().get_context_data(**kwargs)
-        context["category"] = self.category
-        
-        # Add categories and recent articles for sidebar
-        context["categories"] = Category.objects.all()
-        context["recent_articles"] = Article.objects.filter(
-            status="published"
-        ).order_by("-published_date")[:5]
-        
+        context['category'] = self.category
+        context['categories'] = Category.objects.annotate(
+            posts_count=Count('posts')
+        )
+        context['tags'] = Tag.objects.annotate(
+            posts_count=Count('posts')
+        ).order_by('-posts_count')[:10]
         return context
 
 
-class ReporterDetailView(ListView):
-    """View for displaying a reporter's profile and articles"""
-    template_name = "news/reporter_detail.html"
-    context_object_name = "articles"
+class TagPostListView(ListView):
+    """View for listing posts with a specific tag"""
+    model = Post
+    template_name = 'blog/tag_posts.html'
+    context_object_name = 'posts'
     paginate_by = 5
     
     def get_queryset(self):
-        """Get articles by the selected reporter"""
-        self.reporter = get_object_or_404(Reporter, pk=self.kwargs["pk"])
-        return Article.objects.filter(reporter=self.reporter, status="published")
+        """Get posts for the specified tag"""
+        self.tag = Tag.objects.get(slug=self.kwargs['slug'])
+        return Post.blog_objects.by_tag(self.tag.slug)
     
     def get_context_data(self, **kwargs):
-        """Add reporter and sidebar info to context"""
+        """Add additional context data"""
         context = super().get_context_data(**kwargs)
-        context["reporter"] = self.reporter
-        
-        # Add categories and recent articles for sidebar
-        context["categories"] = Category.objects.all()
-        context["recent_articles"] = Article.objects.filter(
-            status="published"
-        ).order_by("-published_date")[:5]
-        
+        context['tag'] = self.tag
+        context['categories'] = Category.objects.all()
+        context['tags'] = Tag.objects.annotate(
+            posts_count=Count('posts')
+        ).order_by('-posts_count')[:10]
         return context
-
-
-class TagDetailView(ListView):
-    """View for displaying articles with a specific tag"""
-    template_name = "news/tag_detail.html"
-    context_object_name = "articles"
-    paginate_by = 5
+class CommentCreateView(LoginRequiredMixin, CreateView):
+    """View for creating a new comment on a post"""
+    model = Comment
+    template_name = 'blog/comment_form.html'
+    fields = ['content']
     
-    def get_queryset(self):
-        """Get articles with the selected tag"""
-        self.tag = get_object_or_404(Tag, slug=self.kwargs["slug"])
-        return self.tag.articles.filter(status="published")
+    def form_valid(self, form):
+        """Associate comment with the post and user"""
+        form.instance.author = self.request.user
+        form.instance.post = Post.objects.get(slug=self.kwargs['slug'])
+        return super().form_valid(form)
+    
+    def get_success_url(self):
+        """Redirect to the post detail page after successful comment"""
+        return reverse_lazy('blog:post_detail', kwargs={'slug': self.kwargs['slug']})
     
     def get_context_data(self, **kwargs):
-        """Add tag and sidebar info to context"""
+        """Add post to context"""
         context = super().get_context_data(**kwargs)
-        context["tag"] = self.tag
-        
-        # Add categories and recent articles for sidebar
-        context["categories"] = Category.objects.all()
-        context["recent_articles"] = Article.objects.filter(
-            status="published"
-        ).order_by("-published_date")[:5]
-        
+        context['post'] = Post.objects.get(slug=self.kwargs['slug'])
         return context
-    
-class ArticleCreateView(CreateView):
-    """View to create a new article"""
-    model = Article
-    template_name = "news/article_form.html"
-    fields = [
-        "title",
-        "slug",
-        "content",
-        "summary",
-        "image",
-        "category",
-        "reporter",
-        "status"
-    ]
-    success_url = reverse_lazy("news:home")
-    
-class CategoryCreateView(CreateView):
-    model = Category
-    template_name = 'news/category_form.html'
-    fields = ['name', 'slug', 'description']
-    success_url = reverse_lazy('news:home')
-# Create your views here.

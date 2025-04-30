@@ -1,24 +1,21 @@
 from django.urls import path
 from . import views
-from .views import ArticleCreateView
 
-app_name = "news"
+app_name = 'blog'
 
 urlpatterns = [
-    # Home page with latest articles
-    path("", views.ArticleListView.as_view(), name="home"),
+    # Home page (post list)
+    path('', views.PostListView.as_view(), name='post_list'),
     
-    # Article detail page
-    path("article/<slug:slug>/", views.ArticleDetailView.as_view(), name="article_detail"),
+    # Post detail
+    path('post/<slug:slug>/', views.PostDetailView.as_view(), name='post_detail'),
     
-    # Category pages
-    path("category/<slug:slug>/", views.CategoryDetailView.as_view(), name="category_detail"),
+    # Category posts
+    path('category/<slug:slug>/', views.CategoryPostListView.as_view(), name='category_detail'),
     
-    # Reporter pages
-    path("reporter/<int:pk>/", views.ReporterDetailView.as_view(), name="reporter_detail"),
+    # Tag posts
+    path('tag/<slug:slug>/', views.TagPostListView.as_view(), name='tag_detail'),
     
-    # Tag pages
-    path("tag/<slug:slug>/", views.TagDetailView.as_view(), name="tag_detail"),
-    path("articles/new/", ArticleCreateView.as_view(), name="article_create"),
-
+    # Add comment
+    path('post/<slug:slug>/comment/', views.CommentCreateView.as_view(), name='add_comment'),
 ]
